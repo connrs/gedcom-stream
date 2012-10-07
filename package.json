@@ -16,5 +16,8 @@
     "parser"
   ],
   "author": "connrs",
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "mocha": "~1.6.0"
+  }
 }
