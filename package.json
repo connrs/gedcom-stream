@@ -1,0 +1,20 @@
+{
+  "name": "gedcom",
+  "version": "0.1.0",
+  "description": "A GEDCOM file parser.",
+  "main": "index.js",
+  "scripts": {
+    "test": "./node_modules/.bin/mocha --reporter spec"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/connrs/gedcom.js"
+  },
+  "keywords": [
+    "gedcom",
+    "genealogy",
+    "parser"
+  ],
+  "author": "connrs",
+  "license": "MIT"
+}
