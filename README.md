@@ -9,13 +9,12 @@ No special processing of the file occurs; it simply returns a simple array/objec
 Usage is pretty standard: Initialise, pass in a readable stream and then call toArray.
 
     var fs = require('fs'),
-        GedcomFile = require('gedcom-file'),
-        gedcomFile = new GedcomFile(),
+        Gedcom = require('gedcom'),
+        gedcom = new Gedcom(),
         stream = fs.createReadStream('family.ged');
 
-    gedcomFile = new GedcomFile();
-    gedcomFile.readStream(stream);
-    gedcomFile.toArray(function (err, data) {
+    gedcom.readStream(stream);
+    gedcom.toArray(function (err, data) {
       console.log(data);
     });
 

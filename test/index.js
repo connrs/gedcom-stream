@@ -1,14 +1,14 @@
 var assert = require('assert'),
     fs = require('fs'),
     path = require('path'),
-    GedcomFile = require('../');
+    Gedcom = require('../');
 
 describe('Core', function () {
-  var gedcomFile;
+  var gedcom;
 
   // Create a fresh server and registry before each test.
   beforeEach(function (done) {
-    gedcomFile = new GedcomFile();
+    gedcom = new Gedcom();
     done();
   });
 
@@ -21,28 +21,24 @@ describe('Core', function () {
     return fs.createReadStream(path.join(__dirname, 'fixtures', filename), { encoding: 'UTF-8' });
   }
 
-  it('can create a GedcomFile object', function (done) {
-    done();
-  });
-
   it('throws an error when parsing without a stream configured', function (done) {
-    gedcomFile.toArray(function (err, data) {
+    gedcom.toArray(function (err, data) {
       assert.notEqual(err, null);
       done();
     });
   });
 
   it('returns an empty array on parsing an empty gedcom file', function (done) {
-    gedcomFile.readStream(createStream('empty.ged'));
-    gedcomFile.toArray(function (err, data) {
+    gedcom.readStream(createStream('empty.ged'));
+    gedcom.toArray(function (err, data) {
       assert.deepEqual(data, []);
       done();
     });
   });
 
   it('returns an array with a nested object', function (done) {
-    gedcomFile.readStream(createStream('single_object.ged'));
-    gedcomFile.toArray(function (err, data) {
+    gedcom.readStream(createStream('single_object.ged'));
+    gedcom.toArray(function (err, data) {
       assert.deepEqual(data, [
         { id: 'I1', name: 'INDI', value: '', children: [
           { name: 'NAME', value: '', children: [] }
@@ -55,8 +51,8 @@ describe('Core', function () {
   });
 
   it('returns a multi-level array for multi-level GEDCOM files', function(done) {
-    gedcomFile.readStream(createStream('nested_objects.ged'));
-    gedcomFile.toArray(function (err, data) {
+    gedcom.readStream(createStream('nested_objects.ged'));
+    gedcom.toArray(function (err, data) {
       assert.deepEqual(data, [
         { id: 'I1', name: 'INDI', value: '', children: [
           { name: 'NAME', value: 'Joe Bloggs', children: [] }
