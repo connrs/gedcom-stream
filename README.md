@@ -1,4 +1,5 @@
 # GEDCOM File
+[![Travis CI Test Status](https://travis-ci.org/connrs/gedcom-stream.png)](https://travis-ci.org/connrs/gedcom-stream)
 
 A processor for GEDCOM files. Gedcom is a writable stream that you can pipe data in to. It will emit objects (each one representing an entry from the GEDCOM file) as the stream is piped in.
 
