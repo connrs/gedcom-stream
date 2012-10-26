@@ -1,22 +1,21 @@
 # GEDCOM File
 
-A processor for GEDCOM files. Pass a readable stream and then call its toArray method to return the data in a friendly format.
-
-No special processing of the file occurs; it simply returns a simple array/object that you can then easily post process when creating genealogy applications.
+A processor for GEDCOM files. Gedcom is a writable stream that you can pipe data in to. It will emit objects (each one representing an entry from the GEDCOM file) as the stream is piped in.
 
 ## Usage
 
-Usage is pretty standard: Initialise, pass in a readable stream and then call toArray.
+The implementation matches any standard writable stream: Initialise, pipe in a readable stream and use the data, end and error events to handle the output.
 
     var fs = require('fs'),
         Gedcom = require('gedcom'),
         gedcom = new Gedcom(),
-        stream = fs.createReadStream('family.ged');
+        data = [];
 
-    gedcom.readStream(stream);
-    gedcom.toArray(function (err, data) {
-      console.log(data);
+    gedcom.on('data', data.push.bind(data));
+    gedcom.on('data', function (data) {
+      db.insert(data);
     });
+    fs.createReadStream('family.ged').pipe(gedcom);
 
 ## Licence
 

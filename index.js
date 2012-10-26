@@ -1,69 +1,62 @@
 var fs = require('fs'),
-    EventEmitter = require('events').EventEmitter;
+    Stream = require('stream').Stream;
 
 function Gedcom() {
   this._buffer = '';
   this._currentContext = [];
-  this._currentLevel = 0;
+  this._previousDepth = 0;
   this._data = [];
   this._err = null;
   this._lines = [];
-  this._lineData = undefined;
-  this._processed = false;
-  this._stream = null;
+  this._line = null;
+  this._previousLine = undefined;
 }
 
-Gedcom.prototype = Object.create(EventEmitter.prototype);
+Gedcom.prototype = new Stream();
+Gedcom.prototype.writable = true;
 
-Gedcom.prototype.setFile = function (filename) {
-  this.filename = filename;
+Gedcom.prototype.write = function (data) {
+  this._streamIntoLines(data);
+  this._process();
 };
 
-Gedcom.prototype.toArray = function (callback) {
-  if (!this._stream) {
-    callback(new Error('You attempted to convert a GEDCOM without providing a stream.'));
-  }
-  else {
-    if (this._processed) {
-      callback(this._err, this._data);
-    }
-    else {
-      this.on('processed', callback);
-    }
-  }
-};
-
-Gedcom.prototype.readStream = function (stream) {
-  this._stream = stream;
-  this._stream.on('error', this._streamError.bind(this));
-  this._stream.on('end', this._process.bind(this));
-  this._stream.on('data', this._streamIntoLines.bind(this));
+Gedcom.prototype.end = function () {
+  this._clearBufferIntoLines()
+      ._process()
+      ._finishProcessing();
 };
 
 Gedcom.prototype._streamError = function (err) {
-  this.emit('processed', err);
+  this.emit('error', err);
+  this.writable = false;
 };
 
 Gedcom.prototype._streamIntoLines = function (data) {
   var lines;
 
-  this._buffer += data;
+  this._appendDataToBuffer(data);
   lines = this._splitBufferByNewlines();
   this._buffer = lines.length > 1 ? lines.pop() : '';
   Array.prototype.push.apply(this._lines, lines);
 };
 
+Gedcom.prototype._appendDataToBuffer = function (data) {
+  this._buffer += data;
+};
+
 Gedcom.prototype._process = function () {
-  this._clearBufferIntoLines()
-      ._preprocessLines()
-      ._initialiseProcessingContext()
-      ._processLines()
-      ._finishProcessing();
+  this._preprocessLines()
+      ._processLines();
+
+  return this;
 };
 
 Gedcom.prototype._clearBufferIntoLines = function () {
+  var lines;
+
   if (this._buffer !== '') {
-    this._lines.push(this._buffer);
+    lines = this._splitBufferByNewlines();
+    Array.prototype.push.apply(this._lines, lines);
   }
 
   return this;
@@ -71,14 +64,18 @@ Gedcom.prototype._clearBufferIntoLines = function () {
 
 Gedcom.prototype._preprocessLines = function () {
   this._lines = this._lines.map(this._preprocessLine.bind(this));
-
   return this;
 };
 
 Gedcom.prototype._preprocessLine = function (line) {
-  var data = line.split(' '),
+  var data,
       newData = {};
 
+  if (Object.prototype.toString.call(line) === '[object Object]') {
+    return line;
+  }
+
+  data = line.split(' ');
   newData.level = +data.shift();
 
   if (data[0].match(/@.*@/)) {
@@ -92,84 +89,108 @@ Gedcom.prototype._preprocessLine = function (line) {
 };
 
 Gedcom.prototype._processLines = function () {
-  var linesLength = this._lines.length,
-      lineNumber;
-
-  for (lineNumber = 0; lineNumber < linesLength && !this._err; lineNumber++) {
-    this._processLine(lineNumber);
+  while (this._setNextLine() && !this._err) {
+    this._processLine();
   }
 
   return this;
 };
 
-Gedcom.prototype._processLine = function (lineNumber) {
-  if (this._nextLevelIsHigher(lineNumber)) {
+Gedcom.prototype._setNextLine = function () {
+  this._line = this._lines.shift();
+  return !!this._line;
+};
+
+Gedcom.prototype._processLine = function () {
+  if (this._currentLineIsNewZeroLevelEntry()) {
+    this._initialiseProcessingContext();
+    this._emitData();
+  }
+  else if (this._lineDepthIsHigher()) {
     this._incrementContext();
   }
-  else if (this._nextLevelIsLower(lineNumber)) {
+  else if (this._lineDepthIsLower()) {
     this._decrementContext();
   }
-  else if (!this._nextLevelIsSame(lineNumber)) {
-    this._abortStreamProcessing();
+  else if (!this._lineDepthIsSame()) {
+    this._emitInvalidNestingError();
     return;
   }
 
-  this._postprocessLineData(lineNumber);
-  this._pushToEndOfCurrentContext(this._lineData);
+  this._previousDepth = this._line.level;
+  this._postProcessLine();
+  this._pushLineOnStack();
 };
 
 Gedcom.prototype._initialiseProcessingContext = function () {
-  this._currentContext.push(this._data);
-  this._currentLevel = 0;
+  this._currentContext = [this._data];
+  this._previousDepth = 0;
 
   return this;
 };
 
-Gedcom.prototype._nextLevelIsHigher = function (currentLine) {
-  return this._lines[currentLine].level - this._currentLevel === 1;
+Gedcom.prototype._currentLineIsNewZeroLevelEntry = function () {
+  return this._line.level === 0;
+};
+
+Gedcom.prototype._emitData = function() {
+  if (this._data.length) {
+    this.emit('data', this._data.shift());
+  }
+};
+
+Gedcom.prototype._lineDepthIsHigher = function (line) {
+  return this._line.level - this._previousDepth === 1;
 };
 
 Gedcom.prototype._incrementContext = function () {
-  this._currentLevel += 1;
-  this._currentContext.push(this._lineData.children);
+  this._currentContext.push(this._previousLine.children);
 };
 
-Gedcom.prototype._nextLevelIsSame = function (currentLine) {
-  return this._lines[currentLine].level - this._currentLevel === 0;
+Gedcom.prototype._lineDepthIsSame = function (line) {
+  return this._line.level - this._previousDepth === 0;
 };
 
 Gedcom.prototype._decrementContext = function () {
-  this._currentLevel -= 1;
-  this._currentContext.pop();
+  var times = this._previousDepth - this._line.level,
+      i;
+
+  for (i = 0; i < times; i++) {
+    this._currentContext.pop();
+  }
 };
 
-Gedcom.prototype._nextLevelIsLower = function (currentLine) {
-  return this._lines[currentLine].level - this._currentLevel === -1;
+Gedcom.prototype._lineDepthIsLower = function (line) {
+  return this._line.level < this._previousDepth;
 };
 
-Gedcom.prototype._abortStreamProcessing = function () {
-    this._err = new Error('Error processing GEDCOM file.');
+Gedcom.prototype._emitInvalidNestingError = function () {
+  this._err = true;
+  this._streamError(new Error('Invalid nesting level on GEDCOM file.'));
 };
 
-Gedcom.prototype._postprocessLineData = function (lineNumber) {
-  delete this._lines[lineNumber].level;
-  this._lineData = this._lines[lineNumber];
+Gedcom.prototype._postProcessLine = function () {
+  delete this._line.level;
+  this._previousLine = this._line;
 };
 
-Gedcom.prototype._pushToEndOfCurrentContext = function (data) {
-  this._currentContext.slice(-1)[0].push(data);
+Gedcom.prototype._pushLineOnStack = function () {
+  this._currentContext.slice(-1)[0].push(this._previousLine);
 };
 
 Gedcom.prototype._finishProcessing = function () {
-  this.emit('processed', this._err, this._data);
-  this._processed = true;
+  this._emitData();
+  this.emit('end');
+  this._setStreamUnwritable();
+};
 
-  return this;
+Gedcom.prototype._setStreamUnwritable = function () {
+  this.writable = false;
 };
 
 Gedcom.prototype._splitBufferByNewlines = function () {
-  return this._buffer.split(/\r?\n/).filter(function (i) {
-    return i !== '';
+  return this._buffer.split(/\r?\n/).filter(function (line) {
+    return line !== '';
   });
 };
 

@@ -1,44 +1,24 @@
 var assert = require('assert'),
     fs = require('fs'),
     path = require('path'),
-    Gedcom = require('../');
+    GedcomStream = require('../');
 
 describe('Core', function () {
-  var gedcom;
+  var gedcomStream,
+      data;
 
-  // Create a fresh server and registry before each test.
-  beforeEach(function (done) {
-    gedcom = new Gedcom();
-    done();
-  });
-
-  // Close the server after each test.
-  afterEach(function (done) {
-    done();
+  beforeEach(function () {
+    gedcomStream = new GedcomStream();
+    data = [];
+    gedcomStream.on('data', data.push.bind(data));
   });
 
   function createStream(filename) {
     return fs.createReadStream(path.join(__dirname, 'fixtures', filename), { encoding: 'UTF-8' });
   }
 
-  it('throws an error when parsing without a stream configured', function (done) {
-    gedcom.toArray(function (err, data) {
-      assert.notEqual(err, null);
-      done();
-    });
-  });
-
-  it('returns an empty array on parsing an empty gedcom file', function (done) {
-    gedcom.readStream(createStream('empty.ged'));
-    gedcom.toArray(function (err, data) {
-      assert.deepEqual(data, []);
-      done();
-    });
-  });
-
   it('returns an array with a nested object', function (done) {
-    gedcom.readStream(createStream('single_object.ged'));
-    gedcom.toArray(function (err, data) {
+    gedcomStream.on('end', function () {
       assert.deepEqual(data, [
         { id: 'I1', name: 'INDI', value: '', children: [
           { name: 'NAME', value: '', children: [] }
@@ -48,11 +28,11 @@ describe('Core', function () {
       ]);
       done();
     });
+    createStream('single_object.ged').pipe(gedcomStream);
   });
 
-  it('returns a multi-level array for multi-level GEDCOM files', function(done) {
-    gedcom.readStream(createStream('nested_objects.ged'));
-    gedcom.toArray(function (err, data) {
+  it('returns a multilevel array for multilevel GEDCOM files', function (done) {
+    gedcomStream.on('end', function () {
       assert.deepEqual(data, [
         { id: 'I1', name: 'INDI', value: '', children: [
           { name: 'NAME', value: 'Joe Bloggs', children: [] }
@@ -66,5 +46,14 @@ describe('Core', function () {
       ]);
       done();
     });
+    createStream('nested_objects.ged').pipe(gedcomStream);
+  });
+
+  it('throws an error when the GEDCOM entry nesting is malformed', function (done) {
+    gedcomStream.on('error', function (err) {
+      assert.throws(err, Error);
+      done();
+    });
+    createStream('malformed_gedcom.ged').pipe(gedcomStream);
   });
 });

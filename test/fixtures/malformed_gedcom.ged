@@ -1,0 +1,6 @@
+0 @I1@ INDI
+1 NAME Joe Bloggs
+0 @I2@ INDI
+1 NAME Jim Bliggs
+1 ASSO @I1@
+3 RELA Godfather
