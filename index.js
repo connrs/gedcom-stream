@@ -189,9 +189,7 @@ Gedcom.prototype._setStreamUnwritable = function () {
 };
 
 Gedcom.prototype._splitBufferByNewlines = function () {
-  return this._buffer.split(/\r?\n/).filter(function (line) {
-    return line !== '';
-  });
+  return this._buffer.split(/\r?\n/);
 };
 
 module.exports = Gedcom;
