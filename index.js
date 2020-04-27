@@ -78,7 +78,7 @@ Gedcom.prototype._preprocessLine = function (line) {
   data = line.split(' ');
   newData.level = +data.shift();
 
-  if (data[0].match(/@.*@/)) {
+  if (data[0] && data[0].match(/@.*@/)) {
     newData.id = data.shift().replace(/@/gi, '');
   }
 
