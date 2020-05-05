@@ -14,7 +14,7 @@ The implementation matches any standard writable stream: Initialise, pipe in a r
 
     gedcom.on('data', data.push.bind(data));
     gedcom.on('data', function (data) {
-      db.insert(data);
+      // Do something with the data, i.e. db.insert(data);
     });
     fs.createReadStream('family.ged').pipe(gedcom);
 
